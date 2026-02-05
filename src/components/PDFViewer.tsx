@@ -18,6 +18,11 @@ interface PDFViewerProps {
     bookmarks?: SavedCitation[];
 }
 
+const options = {
+    cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+    cMapPacked: true,
+};
+
 export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [pageWidth, setPageWidth] = useState<number>(600);
@@ -140,10 +145,7 @@ export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerP
         '#e9d5ff', // Purple
     ];
 
-    const options = {
-        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-        cMapPacked: true,
-    };
+
 
     return (
         <div
