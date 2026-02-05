@@ -88,25 +88,23 @@ export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
                         <p className="description">
                             Select the Gemini model to use. Try <b>gemini-1.5-flash</b>, <b>gemini-1.5-pro</b>, or <b>gemini-pro</b>.
                         </p>
-                        <input
-                            type="text"
+                        <select
                             value={modelName}
                             onChange={(e) => setModelName(e.target.value)}
-                            placeholder="gemini-1.5-flash"
                             className="input-field"
-                            list="model-options"
-                        />
-                        <datalist id="model-options">
+                            style={{ backgroundColor: 'white', color: 'black' }}
+                        >
                             {availableModels.length > 0 ? (
-                                availableModels.map(m => <option key={m} value={m} />)
+                                availableModels.map(m => <option key={m} value={m}>{m}</option>)
                             ) : (
                                 <>
-                                    <option value="gemini-1.5-flash" />
-                                    <option value="gemini-1.5-pro" />
-                                    <option value="gemini-pro" />
+                                    <option value="gemini-1.5-flash">gemini-1.5-flash (Default)</option>
+                                    <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                                    <option value="gemini-pro">gemini-pro</option>
+                                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
                                 </>
                             )}
-                        </datalist>
+                        </select>
                     </div>
                 </div>
 
