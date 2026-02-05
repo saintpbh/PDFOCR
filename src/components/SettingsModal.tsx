@@ -7,17 +7,22 @@ interface SettingsModalProps {
 
 export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
     const [apiKey, setApiKey] = useState('');
+    const [modelName, setModelName] = useState('gemini-1.5-flash');
 
     useEffect(() => {
         if (isOpen) {
-            const saved = localStorage.getItem('google_gemini_api_key');
-            if (saved) setApiKey(saved);
+            const savedKey = localStorage.getItem('google_gemini_api_key');
+            if (savedKey) setApiKey(savedKey);
+
+            const savedModel = localStorage.getItem('google_gemini_model');
+            if (savedModel) setModelName(savedModel);
         }
     }, [isOpen]);
 
     const handleSave = () => {
         localStorage.setItem('google_gemini_api_key', apiKey);
-        alert('API Key Saved!');
+        localStorage.setItem('google_gemini_model', modelName);
+        alert('Settings Saved!');
         onClose();
     };
 
@@ -45,6 +50,27 @@ export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
                             placeholder="AIzaSy..."
                             className="input-field"
                         />
+                    </div>
+
+                    <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                        <label>AI Model</label>
+                        <p className="description">
+                            Select the Gemini model to use. Try <b>gemini-1.5-flash</b>, <b>gemini-1.5-pro</b>, or <b>gemini-pro</b>.
+                        </p>
+                        <input
+                            type="text"
+                            value={modelName}
+                            onChange={(e) => setModelName(e.target.value)}
+                            placeholder="gemini-1.5-flash"
+                            className="input-field"
+                            list="model-options"
+                        />
+                        <datalist id="model-options">
+                            <option value="gemini-1.5-flash" />
+                            <option value="gemini-1.5-flash-001" />
+                            <option value="gemini-1.5-pro" />
+                            <option value="gemini-pro" />
+                        </datalist>
                     </div>
                 </div>
 

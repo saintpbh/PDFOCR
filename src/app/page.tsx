@@ -96,6 +96,8 @@ export default function Home() {
         if (!selectedFile) return;
 
         const apiKey = localStorage.getItem('google_gemini_api_key');
+        const modelName = localStorage.getItem('google_gemini_model') || 'gemini-1.5-flash';
+
         if (!apiKey) {
             setIsSettingsOpen(true);
             alert('Please save your Google Gemini API Key first.');
@@ -106,7 +108,7 @@ export default function Home() {
         setShowResult(true);
         try {
             const file = await selectedFile.handle.getFile();
-            const text = await analyzePdf(file, apiKey);
+            const text = await analyzePdf(file, apiKey, modelName);
             setAnalysisResult(text);
 
             // Auto Save to file
