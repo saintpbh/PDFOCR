@@ -125,9 +125,9 @@ export default function Home() {
         } catch (e: any) {
             let errorMsg = e.message || e.toString();
             if (errorMsg.includes('429')) {
-                errorMsg = `Quota Exceeded (429).\n\nIf you have a Google Cloud Billing Account, please ensure it is LINKED to this project in the Google Cloud Console to enable Pay-As-You-Go.\n\nOtherwise, this is a Free Tier limit (wait ~1 min).`;
+                errorMsg = `⚠️ 사용량 초과 (429 Error)\n\n무료 사용량을 초과했습니다. 유료(Pay-as-you-go)로 전환하려면 Google Cloud Console에서 결제 계정을 연결(Link)해야 합니다.\n\n그렇지 않으면 약 1분 후 다시 시도해주세요.`;
             }
-            alert('Analysis Failed: ' + errorMsg);
+            alert('분석 실패: ' + errorMsg);
         } finally {
             setIsAnalyzing(false);
         }

@@ -59,7 +59,27 @@ export async function analyzePdf(file: File, apiKey: string, modelName: string =
         }
 
         console.error('Gemini API Error:', error);
-        return `Error: ${error.message}. Please check your API Key and Model settings.`;
+
+        if (error.message.includes('429')) {
+            return `### ⚠️ 분석 실패: 사용량 제한 초과 (429 Error)
+
+**구글 Gemini API의 무료 사용량(Free Tier)을 초과했습니다.**
+
+**💡 해결 방법:**
+1. ⏳ **잠시 기다리기**: 약 1분 정도 기다렸다가 다시 시도해 주세요. (무료 플랜은 분당 요청 횟수가 제한됩니다)
+2. 💳 **유료로 제한 풀기**:
+   [Google Cloud Console Billing](https://console.cloud.google.com/billing)에 접속하여 이 프로젝트에 **결제 계정**을 연결해 주세요.
+   > **알림:** 결제 계정을 연결하면 **유료(Pay-as-you-go)** 요금제로 전환되며, 사용량에 따라 요금이 부과되지만 제한 없이 이용할 수 있습니다.
+
+---
+*(상세 에러 내용)*: ${error.message}`;
+        }
+
+        return `### 🚫 오류 발생
+        
+오류가 발생했습니다: ${error.message}
+        
+API 키 설정이나 모델 설정을 다시 확인해 주세요.`;
     }
 }
 
