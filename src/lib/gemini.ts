@@ -40,7 +40,7 @@ export async function analyzePdf(file: File, apiKey: string, modelName: string =
         if (error.message.includes('404') || error.message.includes('429')) {
             console.warn(`Model ${modelName} failed (404/429). Attempting fallbacks...`);
 
-            const fallbackCandidates = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+            const fallbackCandidates = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
             // Remove the model that just failed
             const candidates = fallbackCandidates.filter(m => m !== modelName);
 
@@ -70,6 +70,20 @@ export async function analyzePdf(file: File, apiKey: string, modelName: string =
 2. 💳 **유료로 제한 풀기**:
    [Google Cloud Console Billing](https://console.cloud.google.com/billing)에 접속하여 이 프로젝트에 **결제 계정**을 연결해 주세요.
    > **알림:** 결제 계정을 연결하면 **유료(Pay-as-you-go)** 요금제로 전환되며, 사용량에 따라 요금이 부과되지만 제한 없이 이용할 수 있습니다.
+
+---
+*(상세 에러 내용)*: ${error.message}`;
+        }
+
+        if (error.message.includes('404')) {
+            return `### 🚫 분석 실패: 모델을 찾을 수 없음 (404 Error)
+
+선택하신 모델(**${modelName}**)을 현재 사용할 수 없습니다.
+
+**💡 해결 방법:**
+1. ⚙️ **설정(Settings)** 메뉴를 열어주세요.
+2. **"🔌 Check Connection"** 버튼을 눌러 사용 가능한 모델 목록을 새로고침하세요.
+3. 목록에서 **gemini-2.0-flash** 또는 **gemini-1.5-flash** 등 다른 모델을 선택하고 저장해 주세요.
 
 ---
 *(상세 에러 내용)*: ${error.message}`;
