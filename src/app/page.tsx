@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { saveDirectoryHandle, getDirectoryHandle } from '../lib/idb';
 import SettingsModal from '../components/SettingsModal';
@@ -54,7 +54,7 @@ export default function Home() {
             const handle = await getDirectoryHandle();
             if (handle) {
                 try {
-                    // @ts-ignore
+                    // @ts-expect-error - IDB types mismatch
                     setRootHandle(handle);
                     listFiles(handle);
                 } catch (e) {
@@ -67,7 +67,7 @@ export default function Home() {
 
     const listFiles = async (dirHandle: FileSystemDirectoryHandle) => {
         const entries: FileEntry[] = [];
-        // @ts-ignore
+        // @ts-expect-error - Values iterator mismatch
         for await (const entry of dirHandle.values()) {
             if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.pdf')) {
                 entries.push({ name: entry.name, kind: 'file', handle: entry as FileSystemFileHandle });
@@ -78,7 +78,7 @@ export default function Home() {
 
     const handleOpenFolder = async () => {
         try {
-            // @ts-ignore
+            // @ts-expect-error - showDirectoryPicker not in TS types
             const handle = await window.showDirectoryPicker();
             if (handle) {
                 await saveDirectoryHandle(handle);
@@ -115,8 +115,8 @@ export default function Home() {
             setAnalysisResult(parsed.rawText);
             setParsedParagraphs(parsed.paragraphs);
             setShowResult(false); // Default to PDF view
-        } catch (e) {
-            // No result
+        } catch (error) {
+            console.log("No existing OCR result found", error);
         }
 
         // 2. Load Bookmarks
@@ -124,6 +124,8 @@ export default function Home() {
         setBookmarkData(loadedBookmarks);
         setMetadata(loadedBookmarks.metadata);
     };
+
+
 
     const runAnalysis = async () => {
         if (!selectedFile) return;
@@ -151,7 +153,8 @@ export default function Home() {
             if (rootHandle) {
                 const resultName = selectedFile.name.replace('.pdf', '_OCR.md');
                 const fileHandle = await rootHandle.getFileHandle(resultName, { create: true });
-                // @ts-ignore
+
+                // @ts-expect-error - File System Access API types
                 const writable = await fileHandle.createWritable();
                 await writable.write(fullOutput);
                 await writable.close();
@@ -161,7 +164,11 @@ export default function Home() {
                     bookmarks: [],
                     savedCitations: []
                 };
-                await saveBookmarks(rootHandle, selectedFile.name, newBookmarkData);
+
+                try {
+                    await saveBookmarks(rootHandle, selectedFile.name, newBookmarkData);
+                } catch (e) { console.error("Failed to save initial bookmarks", e); }
+
                 setBookmarkData(newBookmarkData);
             }
 
@@ -177,7 +184,13 @@ export default function Home() {
     };
 
     const handleAddBookmark = async (text: string, page: number, highlight?: { color: string, opacity: number, areas: HighlightArea[] }) => {
-        if (!selectedFile || !rootHandle) return;
+        // console.log('handleAddBookmark called', text, highlight);
+        // alert(`Add Bookmark: ${text}, Areas: ${highlight?.areas?.length}`);
+
+        if (!selectedFile) {
+            alert(`Missing file!`);
+            return;
+        }
 
         const newCitation: SavedCitation = {
             id: Date.now().toString(),
@@ -193,7 +206,14 @@ export default function Home() {
         };
 
         setBookmarkData(newData);
-        await saveBookmarks(rootHandle, selectedFile.name, newData);
+
+        if (rootHandle) {
+            try {
+                await saveBookmarks(rootHandle, selectedFile.name, newData);
+            } catch (err) {
+                console.error("Failed to save bookmarks:", err);
+            }
+        }
 
         // Auto-switch to bookmarks tab to show feedback
         setSidebarTab('bookmarks');

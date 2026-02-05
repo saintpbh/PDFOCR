@@ -51,10 +51,9 @@ export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerP
     // We need to render highlights on top of pages
     // We filter citations that have highlights and belong to the current page
     const renderHighlights = (pageNumber: number) => {
-        // We need to access the 'bookmarks' prop which we will receive
-        // But first let's update the props interface
+        // console.log(`Rendering highlights for page ${pageNumber}`, bookmarks);
         return (
-            <div className="highlight-overlay" style={{ width: '100%', height: '100%' }}>
+            <div className="highlight-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 50 }}>
                 {bookmarks?.map(bookmark => {
                     if (bookmark.highlight && bookmark.highlight.areas) {
                         return bookmark.highlight.areas
@@ -69,7 +68,7 @@ export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerP
                                         width: `${area.width}%`,
                                         height: `${area.height}%`,
                                         backgroundColor: bookmark.highlight?.color,
-                                        opacity: bookmark.highlight?.opacity
+                                        opacity: bookmark.highlight?.opacity,
                                     }}
                                 />
                             ));
@@ -112,17 +111,30 @@ export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerP
         const rects = range.getClientRects();
         const pageRect = pageElement.getBoundingClientRect();
 
-        const areas = Array.from(rects).map(rect => ({
+        let areas = Array.from(rects).map(rect => ({
             page: pageNumber,
             x: ((rect.left - pageRect.left) / pageRect.width) * 100,
             y: ((rect.top - pageRect.top) / pageRect.height) * 100,
             width: (rect.width / pageRect.width) * 100,
             height: (rect.height / pageRect.height) * 100
-        }));
+        })).filter(a => a.width > 0 && a.height > 0);
+
+        // Fallback: If rects are weird/empty but we have selection, use bounding rect
+        if (areas.length === 0) {
+            const boundingRect = range.getBoundingClientRect();
+            areas = [{
+                page: pageNumber,
+                x: ((boundingRect.left - pageRect.left) / pageRect.width) * 100,
+                y: ((boundingRect.top - pageRect.top) / pageRect.height) * 100,
+                width: (boundingRect.width / pageRect.width) * 100,
+                height: (boundingRect.height / pageRect.height) * 100
+            }];
+        }
 
         // Position for floating button
-        // Use the last rect for button positioning or the bounding rect of range
         const boundingRect = range.getBoundingClientRect();
+
+
 
         setSelection({
             text,
@@ -153,6 +165,8 @@ export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerP
             ref={containerRef}
             onMouseUp={handleSelection}
         >
+
+
             <Document
                 file={fileUrl}
                 onLoadSuccess={onDocumentLoadSuccess}
@@ -161,16 +175,15 @@ export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerP
                 options={options}
             >
                 {Array.from(new Array(numPages), (el, index) => (
-                    <div key={`page_wrapper_${index + 1}`} style={{ position: 'relative' }}>
+                    <div key={`page_wrapper_${index + 1}`} style={{ position: 'relative', marginBottom: '1rem' }}>
                         <Page
                             key={`page_${index + 1}`}
                             pageNumber={index + 1}
                             width={pageWidth}
                             renderTextLayer={true}
                             renderAnnotationLayer={true}
-                        >
-                            {renderHighlights(index + 1)}
-                        </Page>
+                        />
+                        {renderHighlights(index + 1)}
                     </div>
                 ))}
             </Document>
@@ -190,6 +203,7 @@ export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerP
                         border: '1px solid #e2e8f0'
                     }}
                     onMouseDown={(e) => e.stopPropagation()} // Prevent closing
+                    onMouseUp={(e) => e.stopPropagation()} // Prevent clearing selection
                 >
                     <div className="color-picker-row">
                         {colors.map(color => (
@@ -207,12 +221,15 @@ export default function PDFViewer({ fileUrl, onBookmark, bookmarks }: PDFViewerP
                         style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem' }}
                         onClick={(e) => {
                             e.stopPropagation();
-                            onBookmark(selection.text, selection.page, {
-                                color: selectedColor,
-                                opacity: opacity,
-                                areas: selection.areas
-                            });
-                            setSelection(null);
+                            if (selection) {
+                                // alert(`Saving selection! Areas: ${selection.areas.length}`);
+                                onBookmark(selection.text, selection.page, {
+                                    color: selectedColor,
+                                    opacity: opacity,
+                                    areas: selection.areas
+                                });
+                                setSelection(null);
+                            }
                             window.getSelection()?.removeAllRanges();
                         }}
                     >
