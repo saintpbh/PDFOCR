@@ -80,6 +80,12 @@ export default function PDFViewer({ fileUrl, onBookmark }: PDFViewerProps) {
 
     }, []);
 
+
+    const options = {
+        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+        cMapPacked: true,
+    };
+
     return (
         <div
             className="pdf-viewer-container"
@@ -91,6 +97,7 @@ export default function PDFViewer({ fileUrl, onBookmark }: PDFViewerProps) {
                 onLoadSuccess={onDocumentLoadSuccess}
                 loading={<div className="spinner"></div>}
                 error={<div style={{ color: 'red' }}>Failed to load PDF.</div>}
+                options={options}
             >
                 {Array.from(new Array(numPages), (el, index) => (
                     <Page
