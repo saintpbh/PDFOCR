@@ -67,7 +67,6 @@ export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
                         />
                         <datalist id="model-options">
                             <option value="gemini-1.5-flash" />
-                            <option value="gemini-1.5-flash-001" />
                             <option value="gemini-1.5-pro" />
                             <option value="gemini-pro" />
                         </datalist>

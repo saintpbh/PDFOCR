@@ -19,6 +19,22 @@ export async function analyzePdf(file: File, apiKey: string, modelName: string =
         const response = await result.response;
         return response.text();
     } catch (error: any) {
+        // Fallback Logic
+        if (error.message.includes('404') && modelName !== 'gemini-1.5-flash') {
+            console.warn(`Model ${modelName} failed, retrying with gemini-1.5-flash`);
+            const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            try {
+                const result = await fallbackModel.generateContent([
+                    prompt,
+                    base64Data
+                ]);
+                const response = await result.response;
+                return response.text() + "\n\n(Note: Analysis performed using fallback model: gemini-1.5-flash)";
+            } catch (fallbackError: any) {
+                return `Error (Primary & Fallback): ${fallbackError.message}`;
+            }
+        }
+
         console.error('Gemini API Error:', error);
         return `Error: ${error.message}`;
     }
