@@ -36,8 +36,9 @@ export async function analyzePdf(file: File, apiKey: string, modelName: string =
     } catch (error: any) {
         // Fallback Strategy
         // If the primary failed (e.g. 1.5-flash), try 1.5-pro, then gemini-pro
-        if (error.message.includes('404')) {
-            console.warn(`Model ${modelName} failed. Attempting fallbacks...`);
+        // Handle 404 (Not Found) and 429 (Too Many Requests)
+        if (error.message.includes('404') || error.message.includes('429')) {
+            console.warn(`Model ${modelName} failed (404/429). Attempting fallbacks...`);
 
             const fallbackCandidates = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
             // Remove the model that just failed
