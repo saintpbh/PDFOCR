@@ -1,5 +1,10 @@
-// ... imports
+import React, { useState, useEffect } from 'react';
 import { getAvailableModels } from '../lib/gemini';
+
+interface SettingsModalProps {
+    onClose: () => void;
+    isOpen: boolean;
+}
 
 export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
     const [apiKey, setApiKey] = useState('');
