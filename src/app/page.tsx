@@ -4,6 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { saveDirectoryHandle, getDirectoryHandle } from '../lib/idb';
 import SettingsModal from '../components/SettingsModal';
 import { analyzePdf } from '../lib/gemini';
+import { parseGeminiOutput, Paragraph, CitationMetadata } from '../lib/parser';
+import { loadBookmarks, saveBookmarks, BookmarkData, SavedCitation } from '../lib/bookmarks';
+import SearchPanel from '../components/SearchPanel';
 
 interface FileEntry {
     name: string;
@@ -23,15 +26,25 @@ export default function Home() {
     const [analysisResult, setAnalysisResult] = useState<string>('');
     const [showResult, setShowResult] = useState(false);
 
+    // Search & Bookmark State
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [parsedParagraphs, setParsedParagraphs] = useState<Paragraph[]>([]);
+    const [metadata, setMetadata] = useState<CitationMetadata>({
+        title: null, author: null, publicationYear: null, publisher: null
+    });
+    const [bookmarkData, setBookmarkData] = useState<BookmarkData>({
+        metadata: { title: null, author: null, publicationYear: null, publisher: null },
+        bookmarks: [],
+        savedCitations: []
+    });
+
     // Load handle on mount
     useEffect(() => {
         async function loadHandle() {
             const handle = await getDirectoryHandle();
             if (handle) {
-                // Verify permission if needed, for now just try usage
-                // Chrome usually persists for a session or site unless cleared
                 try {
-                    // @ts-ignore - query permission might fail if not fully supported but let's assume valid
+                    // @ts-ignore
                     setRootHandle(handle);
                     listFiles(handle);
                 } catch (e) {
@@ -71,25 +84,47 @@ export default function Home() {
         setSelectedFile(entry);
         setAnalysisResult('');
         setShowResult(false);
+        setParsedParagraphs([]); // Reset parsed data on file change
 
         // Create Blob URL for display
         const file = await entry.handle.getFile();
         const url = URL.createObjectURL(file);
         setFileUrl(url);
 
-        // Check if result already exists (e.g., filename_ocr.md)
-        if (rootHandle) {
-            const resultName = entry.name.replace('.pdf', '_ocr.md');
-            try {
-                const resultHandle = await rootHandle.getFileHandle(resultName);
-                const resultFile = await resultHandle.getFile();
-                const text = await resultFile.text();
-                setAnalysisResult(text);
-                setShowResult(true); // Show stored result automatically if exists
-            } catch (e) {
-                // No result exists
-            }
+        if (!rootHandle) return;
+
+        // 1. Try to load existing OCR result
+        let textContent = '';
+        const resultName = entry.name.replace('.pdf', '_OCR.md');
+        try {
+            const resultHandle = await rootHandle.getFileHandle(resultName);
+            const resultFile = await resultHandle.getFile();
+            textContent = await resultFile.text();
+
+            // If exists, parse it directly
+            const parsed = parseGeminiOutput(textContent + "\n\n"); // Add dummy newline just in case json block is missing or messy? 
+            // Actually parser handles string.
+            // But wait, if we saved ONLY the content text before, we might have lost the JSON block if we didn't save it in .md
+            // The previous logic saved `text` returned from analyzePdf.
+            // If `analyzePdf` returns `text + json`, then `text` variable holds that.
+
+            // Wait, logic check: in runAnalysis below, we setAnalysResult(text).
+            // If we parse here, we can setParsedParagraphs(parsed.paragraphs).
+
+            // If we only saved "clean content" (rawText), then parseGeminiOutput won't find JSON if stripped.
+            // But verify: parseGeminiOutput separates JSON and Content.
+
+            setAnalysisResult(parsed.rawText);
+            setParsedParagraphs(parsed.paragraphs);
+            setShowResult(true);
+        } catch (e) {
+            // No result
         }
+
+        // 2. Load Bookmarks & Metadata (Sidecar)
+        const loadedBookmarks = await loadBookmarks(rootHandle, entry.name);
+        setBookmarkData(loadedBookmarks);
+        setMetadata(loadedBookmarks.metadata);
     };
 
     const runAnalysis = async () => {
@@ -108,18 +143,39 @@ export default function Home() {
         setShowResult(true);
         try {
             const file = await selectedFile.handle.getFile();
-            const text = await analyzePdf(file, apiKey, modelName);
-            setAnalysisResult(text);
+            // This returns Raw Text + JSON Block
+            const fullOutput = await analyzePdf(file, apiKey, modelName);
 
-            // Auto Save to file
+            // Parse it
+            const parsed = parseGeminiOutput(fullOutput);
+
+            setAnalysisResult(parsed.rawText); // Display only text
+            setParsedParagraphs(parsed.paragraphs);
+            setMetadata(parsed.metadata); // Set structured metadata
+
+            // Auto Save Content (_OCR.md)
             if (rootHandle) {
                 const resultName = selectedFile.name.replace('.pdf', '_OCR.md');
                 const fileHandle = await rootHandle.getFileHandle(resultName, { create: true });
                 // @ts-ignore
                 const writable = await fileHandle.createWritable();
-                await writable.write(text);
+                // We save the FULL output (Text + JSON) so we can re-parse it later?
+                // OR we save just text?
+                // If we want to re-load metadata from _OCR.md later without _meta.json, we should save fullOutput.
+                // But we are using _meta.json for metadata.
+                // Let's save fullOutput to _OCR.md to preserve the AI's full response.
+                await writable.write(fullOutput);
                 await writable.close();
-                console.log('Result saved');
+                console.log('Result saved to _OCR.md');
+
+                // Save Metadata & Empty Bookmarks to _meta.json
+                const newBookmarkData: BookmarkData = {
+                    metadata: parsed.metadata,
+                    bookmarks: [],
+                    savedCitations: []
+                };
+                await saveBookmarks(rootHandle, selectedFile.name, newBookmarkData);
+                setBookmarkData(newBookmarkData);
             }
 
         } catch (e: any) {
@@ -131,6 +187,27 @@ export default function Home() {
         } finally {
             setIsAnalyzing(false);
         }
+    };
+
+    const toggleBookmark = async (citation: SavedCitation) => {
+        if (!selectedFile || !rootHandle) return;
+
+        const exists = bookmarkData.savedCitations.some(c => c.id === citation.id);
+        let newCitations = [];
+
+        if (exists) {
+            newCitations = bookmarkData.savedCitations.filter(c => c.id !== citation.id);
+        } else {
+            newCitations = [...bookmarkData.savedCitations, citation];
+        }
+
+        const newData = {
+            ...bookmarkData,
+            savedCitations: newCitations
+        };
+
+        setBookmarkData(newData);
+        await saveBookmarks(rootHandle, selectedFile.name, newData);
     };
 
     return (
@@ -170,13 +247,19 @@ export default function Home() {
                 {selectedFile && fileUrl ? (
                     <div style={{ display: 'flex', flex: 1, flexDirection: 'column', height: '100%' }}>
                         {/* Top Controls */}
-                        <div className="toolbar" style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between' }}>
+                        <div className="toolbar" style={{ padding: '0.5rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontWeight: 600 }}>{selectedFile.name}</span>
-                            <div>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    onClick={() => setIsSearchOpen(true)}
+                                    className="btn-secondary"
+                                    title="Search & Bookmarks"
+                                >
+                                    🔍 Search
+                                </button>
                                 <button
                                     onClick={() => setShowResult(!showResult)}
                                     className="btn-secondary"
-                                    style={{ marginRight: '1rem' }}
                                 >
                                     {showResult ? 'Show PDF' : 'Show Result'}
                                 </button>
@@ -223,6 +306,16 @@ export default function Home() {
             </section>
 
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+            {/* Search Panel Overlay */}
+            <SearchPanel
+                isOpen={isSearchOpen}
+                onClose={() => setIsSearchOpen(false)}
+                paragraphs={parsedParagraphs}
+                metadata={metadata}
+                bookmarkData={bookmarkData}
+                onToggleBookmark={toggleBookmark}
+            />
         </main>
     );
 }
