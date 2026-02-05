@@ -27,7 +27,7 @@ export async function analyzePdf(file: File, apiKey: string, modelName: string =
     const model = genAI.getGenerativeModel({ model: modelName });
 
     const base64Data = await fileToGenerativePart(file);
-    const prompt = promptText || "Analyze this PDF. Extract all text content and present it in a clean Markdown format. If there are tables or forms, represent them structurally.";
+    const prompt = promptText || "Analyze this PDF. Extract all text content and present it in a clean Markdown format. **IMPORTANT: Insert '[Page X]' at the beginning of each new page to support academic citations (e.g., [Page 1], [Page 2]).** If there are tables or forms, represent them structurally.";
 
     try {
         const result = await model.generateContent([prompt, base64Data]);
