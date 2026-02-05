@@ -122,8 +122,12 @@ export default function Home() {
                 console.log('Result saved');
             }
 
-        } catch (e) {
-            alert('Analysis Failed: ' + e);
+        } catch (e: any) {
+            let errorMsg = e.message || e.toString();
+            if (errorMsg.includes('429')) {
+                errorMsg = `Quota Exceeded (429).\n\nIf you have a Google Cloud Billing Account, please ensure it is LINKED to this project in the Google Cloud Console to enable Pay-As-You-Go.\n\nOtherwise, this is a Free Tier limit (wait ~1 min).`;
+            }
+            alert('Analysis Failed: ' + errorMsg);
         } finally {
             setIsAnalyzing(false);
         }
