@@ -113,7 +113,7 @@ export default function Home() {
 
             // Auto Save to file
             if (rootHandle) {
-                const resultName = selectedFile.name.replace('.pdf', '_ocr.md');
+                const resultName = selectedFile.name.replace('.pdf', '_OCR.md');
                 const fileHandle = await rootHandle.getFileHandle(resultName, { create: true });
                 // @ts-ignore
                 const writable = await fileHandle.createWritable();
