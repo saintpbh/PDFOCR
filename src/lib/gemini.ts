@@ -113,8 +113,7 @@ async function fileToGenerativePart(file: File) {
 
     return {
         inlineData: {
-            // @ts-ignore
-            data: await base64EncodedDataPromise,
+            data: await base64EncodedDataPromise as string,
             mimeType: file.type,
         },
     };

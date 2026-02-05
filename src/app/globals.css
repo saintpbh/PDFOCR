@@ -382,3 +382,46 @@ body {
 .bookmark-item:hover .copy-btn {
     opacity: 1;
 }
+
+/* Highlight Overlay */
+.highlight-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    /* Let clicks pass through to text */
+    z-index: 10;
+}
+
+.highlight-rect {
+    position: absolute;
+    mix-blend-mode: multiply;
+    /* Better highlighter effect */
+}
+
+/* Color Picker in Floating Button */
+.color-picker-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    justify-content: center;
+}
+
+.color-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid white;
+    cursor: pointer;
+    transition: transform 0.1s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.color-dot:hover {
+    transform: scale(1.1);
+}
+
+.color-dot.selected {
+    border-color: var(--text-main);
+    transform: scale(1.1);
+}

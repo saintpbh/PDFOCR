@@ -6,7 +6,7 @@ import { saveDirectoryHandle, getDirectoryHandle } from '../lib/idb';
 import SettingsModal from '../components/SettingsModal';
 import { analyzePdf } from '../lib/gemini';
 import { parseGeminiOutput, Paragraph, CitationMetadata } from '../lib/parser';
-import { loadBookmarks, saveBookmarks, BookmarkData, SavedCitation } from '../lib/bookmarks';
+import { loadBookmarks, saveBookmarks, BookmarkData, SavedCitation, HighlightArea } from '../lib/bookmarks';
 import SearchPanel from '../components/SearchPanel';
 
 // Dynamically import PDFViewer to avoid SSR issues with canvas/pdfjs
@@ -176,14 +176,15 @@ export default function Home() {
         }
     };
 
-    const handleAddBookmark = async (text: string, page: number) => {
+    const handleAddBookmark = async (text: string, page: number, highlight?: { color: string, opacity: number, areas: HighlightArea[] }) => {
         if (!selectedFile || !rootHandle) return;
 
         const newCitation: SavedCitation = {
             id: Date.now().toString(),
             text: text,
             page: page,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            highlight: highlight
         };
 
         const newData = {
@@ -362,7 +363,7 @@ export default function Home() {
                         {/* Viewer Card */}
                         <div className="viewer-card">
                             {!showResult ? (
-                                <PDFViewer fileUrl={fileUrl} onBookmark={handleAddBookmark} />
+                                <PDFViewer fileUrl={fileUrl} onBookmark={handleAddBookmark} bookmarks={bookmarkData.savedCitations} />
                             ) : (
                                 <div style={{ height: '100%', padding: '3rem', overflowY: 'auto', background: 'white' }}>
                                     {isAnalyzing && (

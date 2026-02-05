@@ -9,11 +9,24 @@ export interface BookmarkData {
     savedCitations: SavedCitation[];
 }
 
+export interface HighlightArea {
+    page: number;
+    x: number; // Percentage (0-100)
+    y: number; // Percentage (0-100)
+    width: number; // Percentage (0-100)
+    height: number; // Percentage (0-100)
+}
+
 export interface SavedCitation {
     id: string;
     text: string;
     page: number;
     timestamp: number;
+    highlight?: {
+        color: string; // Hex code
+        opacity: number; // 0.0 - 1.0
+        areas: HighlightArea[];
+    };
 }
 
 // Sidecar filename: "filename.pdf_meta.json" or similar
