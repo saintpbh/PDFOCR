@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Fuse from 'fuse.js';
 import { Paragraph, CitationMetadata } from '../lib/parser';
 import { BookmarkData, SavedCitation } from '../lib/bookmarks';
@@ -28,9 +28,9 @@ export default function SearchPanel({
     const fuse = useMemo(() => {
         return new Fuse(paragraphs, {
             keys: ['text'],
-            threshold: 0.4, // Fuzzy threshold (0.0 = exact match, 1.0 = match anything)
+            threshold: 0.4,
             includeScore: true,
-            ignoreLocation: true // Search anywhere in the text
+            ignoreLocation: true
         });
     }, [paragraphs]);
 
@@ -42,11 +42,9 @@ export default function SearchPanel({
     if (!isOpen) return null;
 
     const formatCitation = (para: Paragraph) => {
-        // Chicago Style (Note): Author, *Title* (City: Publisher, Year), Page.
         const author = metadata.author || 'Unknown Author';
         const title = metadata.title || 'Unknown Title';
         const year = metadata.publicationYear || 'n.d.';
-
         return `${author}, *${title}* (${year}), p. ${para.page}.`;
     };
 
@@ -55,26 +53,40 @@ export default function SearchPanel({
     };
 
     return (
-        <div className="search-panel settings-modal-overlay"> {/* Reuse overlay style */}
-            <div className="settings-modal" style={{ width: '500px', height: '80vh', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #eee', paddingBottom: '0.5rem' }}>
-                    <h2 style={{ margin: 0 }}>🔍 Search & Citations</h2>
-                    <button onClick={onClose} className="btn-secondary">Close</button>
+        <div className="settings-modal-overlay">
+            <div className="settings-modal glass-panel" style={{ width: '550px', height: '85vh', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h2 className="gradient-text" style={{ margin: 0, fontSize: '1.5rem' }}>🔍 Intelligent Search</h2>
+                    <button onClick={onClose} className="btn-icon">✕</button>
                 </div>
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.03)', padding: '4px', borderRadius: '12px' }}>
                     <button
                         className={`btn-secondary ${activeTab === 'search' ? 'active-tab' : ''}`}
                         onClick={() => setActiveTab('search')}
-                        style={{ flex: 1, fontWeight: activeTab === 'search' ? 'bold' : 'normal', border: activeTab === 'search' ? '2px solid #2563eb' : '1px solid #ddd' }}
+                        style={{
+                            flex: 1,
+                            border: 'none',
+                            background: activeTab === 'search' ? 'white' : 'transparent',
+                            boxShadow: activeTab === 'search' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                            fontWeight: activeTab === 'search' ? 600 : 500,
+                            borderRadius: '8px'
+                        }}
                     >
                         Search
                     </button>
                     <button
                         className={`btn-secondary ${activeTab === 'bookmarks' ? 'active-tab' : ''}`}
                         onClick={() => setActiveTab('bookmarks')}
-                        style={{ flex: 1, fontWeight: activeTab === 'bookmarks' ? 'bold' : 'normal', border: activeTab === 'bookmarks' ? '2px solid #2563eb' : '1px solid #ddd' }}
+                        style={{
+                            flex: 1,
+                            border: 'none',
+                            background: activeTab === 'bookmarks' ? 'white' : 'transparent',
+                            boxShadow: activeTab === 'bookmarks' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
+                            fontWeight: activeTab === 'bookmarks' ? 600 : 500,
+                            borderRadius: '8px'
+                        }}
                     >
                         Bookmarks ({bookmarkData.savedCitations.length})
                     </button>
@@ -84,15 +96,16 @@ export default function SearchPanel({
                     <>
                         <input
                             type="text"
-                            placeholder="Type to similar search..."
+                            placeholder="Type keywords to search..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: '1px solid #ccc', marginBottom: '1rem' }}
+                            className="input-field"
+                            style={{ marginBottom: '1.5rem' }}
                             autoFocus
                         />
 
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            {query && results.length === 0 && <p style={{ color: '#888' }}>No results found.</p>}
+                        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
+                            {query && results.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '2rem' }}>No results found.</p>}
                             {results.map((para) => (
                                 <CitationCard
                                     key={para.id}
@@ -110,8 +123,8 @@ export default function SearchPanel({
                         </div>
                     </>
                 ) : (
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
-                        {bookmarkData.savedCitations.length === 0 && <p style={{ color: '#888' }}>No bookmarks saved yet.</p>}
+                    <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
+                        {bookmarkData.savedCitations.length === 0 && <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '2rem' }}>No bookmarks saved yet.</p>}
                         {bookmarkData.savedCitations.map((saved) => (
                             <CitationCard
                                 key={saved.id}
@@ -131,20 +144,21 @@ export default function SearchPanel({
 function CitationCard({ para, citation, isBookmarked, onToggle }: { para: Paragraph, citation: string, isBookmarked: boolean, onToggle: () => void }) {
     return (
         <div style={{
-            border: '1px solid #eee',
-            borderRadius: '8px',
-            padding: '1rem',
+            border: '1px solid rgba(0,0,0,0.06)',
+            borderRadius: '16px',
+            padding: '1.25rem',
             marginBottom: '1rem',
-            backgroundColor: '#f9f9f9',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            backgroundColor: 'white',
+            boxShadow: '0 4px 6px -2px rgba(0,0,0,0.02)',
+            transition: 'transform 0.2s',
         }}>
             {/* Paragraph Text Preview */}
-            <p style={{ fontSize: '0.9rem', color: '#333', maxHeight: '100px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', marginBottom: '0.5rem' }}>
+            <p style={{ fontSize: '0.95rem', color: 'var(--text-main)', lineHeight: '1.6', maxHeight: '120px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', marginBottom: '0.75rem' }}>
                 {para.text}
             </p>
 
             {/* Citation Box */}
-            <div style={{ backgroundColor: '#eef2ff', padding: '0.5rem', borderRadius: '4px', fontSize: '0.85rem', color: '#4f46e5', marginBottom: '0.5rem', fontStyle: 'italic' }}>
+            <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--secondary-color)', marginBottom: '0.75rem', fontStyle: 'italic', border: '1px solid #f1f5f9' }}>
                 {citation}
             </div>
 
@@ -154,15 +168,17 @@ function CitationCard({ para, citation, isBookmarked, onToggle }: { para: Paragr
                     border: 'none',
                     background: 'none',
                     cursor: 'pointer',
-                    color: isBookmarked ? '#dc2626' : '#9ca3af',
-                    fontWeight: 'bold',
+                    color: isBookmarked ? '#ef4444' : '#cbd5e1',
+                    fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    fontSize: '0.9rem'
+                    fontSize: '0.85rem',
+                    transition: 'color 0.2s'
                 }}
             >
-                {isBookmarked ? '★ Bookmarked' : '☆ Add Bookmark'}
+                <span style={{ fontSize: '1.1rem' }}>{isBookmarked ? '★' : '☆'}</span>
+                {isBookmarked ? 'Saved' : 'Save Bookmark'}
             </button>
         </div>
     );

@@ -14,20 +14,26 @@ export async function getAvailableModels(apiKey: string): Promise<string[]> {
         return data.models
             .filter((m: any) => m.supportedGenerationMethods.includes('generateContent'))
             .map((m: any) => m.name.replace('models/', ''));
-    } catch (e) {
+    } catch (e: unknown) {
         console.error('Failed to list models', e);
         throw e; // Re-throw to be caught in UI
     }
 }
 
-export async function analyzePdf(file: File, apiKey: string, modelName: string = 'gemini-1.5-flash', promptText?: string): Promise<string> {
+export async function analyzePdf(file: File, apiKey: string, modelName: string): Promise<string> {
     if (!apiKey) throw new Error('API Key is missing');
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
 
     const base64Data = await fileToGenerativePart(file);
-    const prompt = promptText || "Analyze this PDF. Extract all text content and present it in a clean Markdown format. **IMPORTANT: Insert '[Page X]' at the beginning of each new page to support academic citations (e.g., [Page 1], [Page 2]).** If there are tables or forms, represent them structurally.";
+    const prompt = `Analyze this PDF. 
+
+1. Extract all text content and present it in a clean **Markdown** format.
+2. **IMPORTANT**: Insert **'[Page X]'** at the beginning of each new page to support academic citations (e.g., [Page 1], [Page 2]).
+3. **METADATA**: At the VERY END of the response, strictly append a JSON block having the following structure (do not use code blocks, just the raw JSON string):
+{"title": "Document Title", "author": "Author Name", "publicationYear": "Year", "publisher": "Publisher"}
+If specific fields are not found, use null.`;
 
     try {
         const result = await model.generateContent([prompt, base64Data]);

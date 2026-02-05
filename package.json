@@ -12,10 +12,13 @@
     "@ai-sdk/google": "^3.0.21",
     "@google/generative-ai": "^0.24.1",
     "ai": "^6.0.70",
+    "fuse.js": "^7.1.0",
     "idb": "^8.0.3",
     "next": "16.1.6",
+    "pdfjs-dist": "^5.4.624",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-pdf": "^10.3.0"
   },
   "devDependencies": {
     "@types/node": "^20",

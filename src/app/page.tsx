@@ -1,12 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { saveDirectoryHandle, getDirectoryHandle } from '../lib/idb';
 import SettingsModal from '../components/SettingsModal';
 import { analyzePdf } from '../lib/gemini';
 import { parseGeminiOutput, Paragraph, CitationMetadata } from '../lib/parser';
 import { loadBookmarks, saveBookmarks, BookmarkData, SavedCitation } from '../lib/bookmarks';
 import SearchPanel from '../components/SearchPanel';
+
+// Dynamically import PDFViewer to avoid SSR issues with canvas/pdfjs
+const PDFViewer = dynamic(() => import('../components/PDFViewer'), {
+    ssr: false,
+    loading: () => <div style={{ display: 'flex', justifyContent: 'center', marginTop: '5rem' }}><div className="spinner"></div></div>
+});
 
 interface FileEntry {
     name: string;
@@ -37,6 +44,9 @@ export default function Home() {
         bookmarks: [],
         savedCitations: []
     });
+
+    // Sidebar Tab State
+    const [sidebarTab, setSidebarTab] = useState<'files' | 'bookmarks'>('files');
 
     // Load handle on mount
     useEffect(() => {
@@ -84,7 +94,8 @@ export default function Home() {
         setSelectedFile(entry);
         setAnalysisResult('');
         setShowResult(false);
-        setParsedParagraphs([]); // Reset parsed data on file change
+        setParsedParagraphs([]);
+        setSidebarTab('files'); // Default to files when switching
 
         // Create Blob URL for display
         const file = await entry.handle.getFile();
@@ -93,35 +104,22 @@ export default function Home() {
 
         if (!rootHandle) return;
 
-        // 1. Try to load existing OCR result
-        let textContent = '';
+        // 1. Load OCR Result
         const resultName = entry.name.replace('.pdf', '_OCR.md');
         try {
             const resultHandle = await rootHandle.getFileHandle(resultName);
             const resultFile = await resultHandle.getFile();
-            textContent = await resultFile.text();
+            const textContent = await resultFile.text();
 
-            // If exists, parse it directly
-            const parsed = parseGeminiOutput(textContent + "\n\n"); // Add dummy newline just in case json block is missing or messy? 
-            // Actually parser handles string.
-            // But wait, if we saved ONLY the content text before, we might have lost the JSON block if we didn't save it in .md
-            // The previous logic saved `text` returned from analyzePdf.
-            // If `analyzePdf` returns `text + json`, then `text` variable holds that.
-
-            // Wait, logic check: in runAnalysis below, we setAnalysResult(text).
-            // If we parse here, we can setParsedParagraphs(parsed.paragraphs).
-
-            // If we only saved "clean content" (rawText), then parseGeminiOutput won't find JSON if stripped.
-            // But verify: parseGeminiOutput separates JSON and Content.
-
+            const parsed = parseGeminiOutput(textContent + "\n\n");
             setAnalysisResult(parsed.rawText);
             setParsedParagraphs(parsed.paragraphs);
-            setShowResult(true);
+            setShowResult(false); // Default to PDF view
         } catch (e) {
             // No result
         }
 
-        // 2. Load Bookmarks & Metadata (Sidecar)
+        // 2. Load Bookmarks
         const loadedBookmarks = await loadBookmarks(rootHandle, entry.name);
         setBookmarkData(loadedBookmarks);
         setMetadata(loadedBookmarks.metadata);
@@ -143,32 +141,21 @@ export default function Home() {
         setShowResult(true);
         try {
             const file = await selectedFile.handle.getFile();
-            // This returns Raw Text + JSON Block
             const fullOutput = await analyzePdf(file, apiKey, modelName);
-
-            // Parse it
             const parsed = parseGeminiOutput(fullOutput);
 
-            setAnalysisResult(parsed.rawText); // Display only text
+            setAnalysisResult(parsed.rawText);
             setParsedParagraphs(parsed.paragraphs);
-            setMetadata(parsed.metadata); // Set structured metadata
+            setMetadata(parsed.metadata);
 
-            // Auto Save Content (_OCR.md)
             if (rootHandle) {
                 const resultName = selectedFile.name.replace('.pdf', '_OCR.md');
                 const fileHandle = await rootHandle.getFileHandle(resultName, { create: true });
                 // @ts-ignore
                 const writable = await fileHandle.createWritable();
-                // We save the FULL output (Text + JSON) so we can re-parse it later?
-                // OR we save just text?
-                // If we want to re-load metadata from _OCR.md later without _meta.json, we should save fullOutput.
-                // But we are using _meta.json for metadata.
-                // Let's save fullOutput to _OCR.md to preserve the AI's full response.
                 await writable.write(fullOutput);
                 await writable.close();
-                console.log('Result saved to _OCR.md');
 
-                // Save Metadata & Empty Bookmarks to _meta.json
                 const newBookmarkData: BookmarkData = {
                     metadata: parsed.metadata,
                     bookmarks: [],
@@ -181,7 +168,7 @@ export default function Home() {
         } catch (e: any) {
             let errorMsg = e.message || e.toString();
             if (errorMsg.includes('429')) {
-                errorMsg = `⚠️ 사용량 초과 (429 Error)\n\n무료 사용량을 초과했습니다. 유료(Pay-as-you-go)로 전환하려면 Google Cloud Console에서 결제 계정을 연결(Link)해야 합니다.\n\n그렇지 않으면 약 1분 후 다시 시도해주세요.`;
+                errorMsg = `⚠️ 사용량 초과 (429 Error)\n\n무료 사용량을 초과했습니다.`;
             }
             alert('분석 실패: ' + errorMsg);
         } finally {
@@ -189,25 +176,47 @@ export default function Home() {
         }
     };
 
-    const toggleBookmark = async (citation: SavedCitation) => {
+    const handleAddBookmark = async (text: string, page: number) => {
         if (!selectedFile || !rootHandle) return;
 
-        const exists = bookmarkData.savedCitations.some(c => c.id === citation.id);
-        let newCitations = [];
-
-        if (exists) {
-            newCitations = bookmarkData.savedCitations.filter(c => c.id !== citation.id);
-        } else {
-            newCitations = [...bookmarkData.savedCitations, citation];
-        }
+        const newCitation: SavedCitation = {
+            id: Date.now().toString(),
+            text: text,
+            page: page,
+            timestamp: Date.now()
+        };
 
         const newData = {
             ...bookmarkData,
-            savedCitations: newCitations
+            savedCitations: [...bookmarkData.savedCitations, newCitation]
         };
 
         setBookmarkData(newData);
         await saveBookmarks(rootHandle, selectedFile.name, newData);
+
+        // Auto-switch to bookmarks tab to show feedback
+        setSidebarTab('bookmarks');
+    };
+
+    const deleteBookmark = async (id: string) => {
+        if (!selectedFile || !rootHandle) return;
+        const newData = {
+            ...bookmarkData,
+            savedCitations: bookmarkData.savedCitations.filter(c => c.id !== id)
+        };
+        setBookmarkData(newData);
+        await saveBookmarks(rootHandle, selectedFile.name, newData);
+    };
+
+    const copyToClipboard = (text: string, citation: SavedCitation) => {
+        // Format: "Text" (Author, Year, p. Page)
+        const author = metadata.author || 'Unknown';
+        const year = metadata.publicationYear || 'n.d.';
+        const formatted = `"${citation.text}" (${author}, ${year}, p. ${citation.page})`;
+
+        navigator.clipboard.writeText(formatted).then(() => {
+            alert('Copied to clipboard!');
+        });
     };
 
     return (
@@ -228,27 +237,80 @@ export default function Home() {
                     </button>
                 </div>
 
-                <div style={{ padding: '0 1.5rem 0.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Files
+                {/* Tabs */}
+                <div className="sidebar-tabs">
+                    <div
+                        className={`sidebar-tab ${sidebarTab === 'files' ? 'active' : ''}`}
+                        onClick={() => setSidebarTab('files')}
+                    >
+                        Files
+                    </div>
+                    <div
+                        className={`sidebar-tab ${sidebarTab === 'bookmarks' ? 'active' : ''}`}
+                        onClick={() => setSidebarTab('bookmarks')}
+                    >
+                        Bookmarks
+                    </div>
                 </div>
 
-                <div className="file-list">
-                    {files.length === 0 && (
-                        <div style={{ padding: '2rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.9rem' }}>
-                            {rootHandle ? 'No PDF files found' : 'Select a folder to start'}
-                        </div>
-                    )}
-                    {files.map(file => (
-                        <div
-                            key={file.name}
-                            className={`file-item ${selectedFile?.name === file.name ? 'active' : ''}`}
-                            onClick={() => handleSelectFile(file)}
-                        >
-                            <span className="file-icon" style={{ opacity: selectedFile?.name === file.name ? 1 : 0.5 }}>📄</span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                        </div>
-                    ))}
-                </div>
+                {sidebarTab === 'files' ? (
+                    <div className="file-list" style={{ flex: 1, overflowY: 'auto' }}>
+                        {files.length === 0 && (
+                            <div style={{ padding: '2rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.9rem' }}>
+                                {rootHandle ? 'No PDF files found' : 'Select a folder to start'}
+                            </div>
+                        )}
+                        {files.map(file => (
+                            <div
+                                key={file.name}
+                                className={`file-item ${selectedFile?.name === file.name ? 'active' : ''}`}
+                                onClick={() => handleSelectFile(file)}
+                            >
+                                <span className="file-icon" style={{ opacity: selectedFile?.name === file.name ? 1 : 0.5 }}>📄</span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div style={{ flex: 1, overflowY: 'auto', background: '#f8fafc' }}>
+                        {bookmarkData.savedCitations.length === 0 ? (
+                            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                                <p>No bookmarks yet.</p>
+                                <p style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>Highlight text in the PDF to add a bookmark.</p>
+                            </div>
+                        ) : (
+                            bookmarkData.savedCitations.map(cit => {
+                                const author = metadata.author || 'Unknown';
+                                const year = metadata.publicationYear || 'n.d.';
+                                const refShort = `${author}, ${year}, p.${cit.page}`;
+
+                                return (
+                                    <div key={cit.id} className="bookmark-item">
+                                        <button
+                                            className="copy-btn"
+                                            onClick={(e) => { e.stopPropagation(); copyToClipboard(cit.text, cit); }}
+                                            title="Copy to Clipboard"
+                                        >
+                                            📋 Copy
+                                        </button>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginBottom: '0.5rem', lineHeight: '1.5' }}>
+                                            "{cit.text}"
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            <span style={{ fontStyle: 'italic' }}>{refShort}</span>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); deleteBookmark(cit.id); }}
+                                                style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444' }}
+                                            >
+                                                🗑
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                )}
             </aside>
 
             {/* Main Content Area */}
@@ -260,7 +322,7 @@ export default function Home() {
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <span style={{ fontWeight: 700, fontSize: '1rem' }}>{selectedFile.name}</span>
                                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    {isAnalyzing ? 'Processing...' : 'Ready'}
+                                    {isAnalyzing ? 'Processing...' : (metadata.title ? `${metadata.title} (${metadata.publicationYear})` : 'Ready')}
                                 </span>
                             </div>
 
@@ -300,12 +362,7 @@ export default function Home() {
                         {/* Viewer Card */}
                         <div className="viewer-card">
                             {!showResult ? (
-                                <embed
-                                    src={`${fileUrl}#toolbar=0`}
-                                    type="application/pdf"
-                                    width="100%"
-                                    height="100%"
-                                />
+                                <PDFViewer fileUrl={fileUrl} onBookmark={handleAddBookmark} />
                             ) : (
                                 <div style={{ height: '100%', padding: '3rem', overflowY: 'auto', background: 'white' }}>
                                     {isAnalyzing && (
@@ -356,7 +413,10 @@ export default function Home() {
                 paragraphs={parsedParagraphs}
                 metadata={metadata}
                 bookmarkData={bookmarkData}
-                onToggleBookmark={toggleBookmark}
+                onToggleBookmark={(citation) => {
+                    // Adapter for legacy toggle
+                    deleteBookmark(citation.id);
+                }}
             />
         </main>
     );

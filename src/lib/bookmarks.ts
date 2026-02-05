@@ -1,5 +1,5 @@
 
-import { CitationMetadata, Paragraph } from './parser';
+import { CitationMetadata } from './parser';
 
 export interface BookmarkData {
     metadata: CitationMetadata;
