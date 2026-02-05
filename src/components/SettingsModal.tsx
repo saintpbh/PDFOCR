@@ -32,15 +32,19 @@ export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
     const checkConnection = async () => {
         if (!apiKey) return alert('Please enter an API Key first');
         setIsLoadingModels(true);
-        const models = await getAvailableModels(apiKey);
-        setIsLoadingModels(false);
-        if (models.length > 0) {
-            setAvailableModels(models);
-            alert(`Connection Successful! Found ${models.length} available models.`);
-            // Auto-select the first one if current is not in list (optional, but good UX)
-            // But let's just let user choose from the datalist now populated
-        } else {
-            alert('Failed to fetch models. Check your API Key.');
+        try {
+            const models = await getAvailableModels(apiKey);
+            setIsLoadingModels(false);
+
+            if (models.length > 0) {
+                setAvailableModels(models);
+                alert(`Connection Successful! Found ${models.length} available models:\n` + models.slice(0, 5).join(', ') + (models.length > 5 ? '...' : ''));
+            } else {
+                alert('Connection Failed: No models found. Check if the API Key is valid and has "Generative Language API" enabled in Google Cloud Console.');
+            }
+        } catch (e: any) {
+            setIsLoadingModels(false);
+            alert(`Connection Error: ${e.message || e.toString()}`);
         }
     };
 
