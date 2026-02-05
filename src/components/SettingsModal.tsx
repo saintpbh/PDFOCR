@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
-
-interface SettingsModalProps {
-    onClose: () => void;
-    isOpen: boolean;
-}
+// ... imports
+import { getAvailableModels } from '../lib/gemini';
 
 export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
     const [apiKey, setApiKey] = useState('');
     const [modelName, setModelName] = useState('gemini-1.5-flash');
+    const [availableModels, setAvailableModels] = useState<string[]>([]);
+    const [isLoadingModels, setIsLoadingModels] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -25,6 +23,22 @@ export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
         alert('Settings Saved!');
         onClose();
     };
+
+    const checkConnection = async () => {
+        if (!apiKey) return alert('Please enter an API Key first');
+        setIsLoadingModels(true);
+        const models = await getAvailableModels(apiKey);
+        setIsLoadingModels(false);
+        if (models.length > 0) {
+            setAvailableModels(models);
+            alert(`Connection Successful! Found ${models.length} available models.`);
+            // Auto-select the first one if current is not in list (optional, but good UX)
+            // But let's just let user choose from the datalist now populated
+        } else {
+            alert('Failed to fetch models. Check your API Key.');
+        }
+    };
+
 
     if (!isOpen) return null;
 
@@ -50,6 +64,14 @@ export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
                             placeholder="AIzaSy..."
                             className="input-field"
                         />
+                        <button
+                            onClick={checkConnection}
+                            disabled={isLoadingModels}
+                            style={{ marginTop: '0.5rem', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                            className="btn-secondary"
+                        >
+                            {isLoadingModels ? 'Checking...' : '🔌 Check Connection & Load Models'}
+                        </button>
                     </div>
 
                     <div className="form-group" style={{ marginTop: '1.5rem' }}>
@@ -66,9 +88,15 @@ export default function SettingsModal({ onClose, isOpen }: SettingsModalProps) {
                             list="model-options"
                         />
                         <datalist id="model-options">
-                            <option value="gemini-1.5-flash" />
-                            <option value="gemini-1.5-pro" />
-                            <option value="gemini-pro" />
+                            {availableModels.length > 0 ? (
+                                availableModels.map(m => <option key={m} value={m} />)
+                            ) : (
+                                <>
+                                    <option value="gemini-1.5-flash" />
+                                    <option value="gemini-1.5-pro" />
+                                    <option value="gemini-pro" />
+                                </>
+                            )}
                         </datalist>
                     </div>
                 </div>
