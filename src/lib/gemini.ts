@@ -1,10 +1,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-export async function analyzePdf(file: File, apiKey: string, promptText?: string): Promise<string> {
+export async function analyzePdf(file: File, apiKey: string, modelName: string = 'gemini-1.5-flash', promptText?: string): Promise<string> {
     if (!apiKey) throw new Error('API Key is missing');
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     // Convert file to base64
     const base64Data = await fileToGenerativePart(file);
